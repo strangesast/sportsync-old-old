@@ -1,0 +1,27 @@
+{
+  "name": "sportsync",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./app/bin/www"
+  },
+  "dependencies": {
+    "body-parser": "*",
+    "cookie-parser": "*",
+    "debug": "*",
+    "express": "*",
+    "jade": "*",
+    "morgan": "*",
+    "serve-favicon": "*"
+  },
+  "devDependencies": {
+    "grunt": "*",
+    "grunt-concurrent": "*",
+    "grunt-contrib-coffee": "*",
+    "grunt-contrib-less": "*",
+    "grunt-contrib-jade": "*",
+    "grunt-contrib-watch": "*",
+    "grunt-nodemon": "*",
+    "load-grunt-tasks": "*"
+  }
+}

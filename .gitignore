@@ -1,0 +1,14 @@
+app/*
+app/routes
+assets/**/*.js
+!app/public
+!app/views
+!app/node_modules
+app/node_modules/*
+public/components
+public/js
+public/css
+!public/fonts
+node_modules/
+npm-debug.log
+*.txt
