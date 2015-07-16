@@ -5,11 +5,12 @@ logger =       require 'morgan'
 cookieParser = require 'cookie-parser'
 bodyParser =   require 'body-parser'
 
-routes = require './routes/index'
+index = require './routes/index'
+add_results = require './routes/add-results'
+
 app = express()
 
 # view engine setup
-
 app.set 'views', path.join __dirname, 'views'
 app.set 'view engine', 'jade'
 
@@ -20,7 +21,9 @@ app.use bodyParser.json()
 app.use bodyParser.urlencoded extended: false
 app.use cookieParser()
 app.use express.static path.join __dirname, 'public' # static file hosting (dev only)
-app.use '/', routes
+
+app.use '/', index
+app.use '/add-results', add_results
 
 app.use (req, res, next) ->
   err = new Error 'Not Found'

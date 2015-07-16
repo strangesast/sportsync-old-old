@@ -11,7 +11,9 @@
     "debug": "*",
     "express": "*",
     "jade": "*",
+    "mongodb": "^2.0.39",
     "morgan": "*",
+    "multer": "^0.1.8",
     "serve-favicon": "*"
   },
   "devDependencies": {

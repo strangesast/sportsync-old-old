@@ -1,0 +1,16 @@
+extends layout
+
+block content
+  h1= title
+  p Upload results sheets.
+
+  input(type="file" id="files" name="files" multiple)
+
+  br
+  .bordered
+    canvas#canvas
+
+
+block scripts
+  script(src="/components/pdfjs-dist/build/pdf.combined.js")
+  script(src="/js/add-results.js")

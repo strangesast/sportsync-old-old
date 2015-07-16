@@ -4,5 +4,9 @@
   "homepage": "https://github.com/strangesast/sportsync",
   "authors": [
     "Sam Zagrobelny <strangesast@gmail.com>"
-  ]
+  ],
+  "dependencies": {
+    "runtime": "https://raw.githubusercontent.com/jadejs/jade/1.11.0/runtime.js",
+    "pdfjs-dist": "mozilla/pdfjs-dist"
+  }
 }
