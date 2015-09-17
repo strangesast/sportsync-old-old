@@ -1,8 +1,7 @@
 extends layout
 
 block content
-  h1= title
-  p Upload results sheets.
+  p Upload stuff :D
 
   input(type="file" id="files" name="files" multiple)
 
@@ -10,7 +9,10 @@ block content
   .bordered
     canvas#canvas
 
+  br
+  pre#text
+
 
 block scripts
   script(src="/components/pdfjs-dist/build/pdf.combined.js")
-  script(src="/js/add-results.js")
+  script(src="/js/upload.js")

@@ -6,7 +6,7 @@ cookieParser = require 'cookie-parser'
 bodyParser =   require 'body-parser'
 
 index = require './routes/index'
-add_results = require './routes/add-results'
+upload = require './routes/upload'
 
 app = express()
 
@@ -23,7 +23,7 @@ app.use cookieParser()
 app.use express.static path.join __dirname, 'public' # static file hosting (dev only)
 
 app.use '/', index
-app.use '/add-results', add_results
+app.use '/upload', upload
 
 app.use (req, res, next) ->
   err = new Error 'Not Found'
