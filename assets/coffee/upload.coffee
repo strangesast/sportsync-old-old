@@ -79,6 +79,51 @@ look_at_headers = (header_text, how_deep) ->
   console.log header_text
 
 
+plot_numbers = (data) ->
+  data = data.slice(0, 10000)
+  canvas = document.getElementById 'plot'
+  h = 300
+  w = canvas.parentElement.clientWidth
+  console.log 'width'
+  console.log w
+  w = data.length*3
+  console.log w
+
+  canvas.width = w
+  canvas.height = h
+
+  ctx = canvas.getContext '2d'
+
+  ctx.beginPath()
+  ctx.moveTo(0, h)
+
+  dmax = data.reduce (a, b) -> if a > b then a else b
+  dmin = data.reduce (a, b) -> if a < b then a else b
+
+  ctx.font = "8px Georgia"
+  for each, i in data
+    xi =  i / data.length * w
+    yi =  h*(1 - (each - dmin)/(dmax-dmin))
+    if i == data.length - 1
+      ctx.moveTo(xi, yi)
+      ctx.closePath()
+    else
+      text = String.fromCharCode each
+      ctx.fillText(text, xi, 10)
+      ctx.lineTo(xi, yi)
+
+  ctx.stroke()
+
+
+parse_for_times = (data) ->
+  re = /([0-9]{1,2}\:)?[0-9]{2}\.[0-9]{2}/g
+  console.log 'parse for data'
+  for item in data
+    itemsFound = []
+    while (itemsFound = re.exec(item)) != null
+      console.log itemsFound
+
+
 handleFileSelection = (e) ->
   files = e.target.files
 
@@ -116,9 +161,10 @@ handleFileSelection = (e) ->
                 render_page(page, ctx, viewport).then (result) ->
                   console.log "rendered page #{page_number}"
 
-                  try_to_solve result
-                    .then (res) ->
-                      console.log res
+                  parse_for_times(result)
+                  #try_to_solve result
+                  #  .then (res) ->
+                  #    console.log res
 
             page_change = (page_change_event) ->
               unless page_change_event.target.name == "down"
@@ -151,6 +197,18 @@ handleFileSelection = (e) ->
               )(page_number)
 
             ).then (all) ->
+              res = all.reduce (a, b) ->
+                a.concat(b)
+              .reduce (a, b) ->
+                a + '\n' + b
+              numbers = []
+              for elem, i in res
+                numbers[i] = elem.charCodeAt(0)
+
+              plot_numbers numbers
+              text.textContent = all[0].join('\n')
+
+              ###
               page_regex = /[P,p]age\s*([1-9][0-9]|[1-9])/
               # remove headers
               first_page = all[0]
@@ -176,6 +234,7 @@ handleFileSelection = (e) ->
 
               console.log string
               text.textContent = first_page.slice(0, header_up_to).join('\n') + "\n\n\n" + string
+              ###
 
 
 
