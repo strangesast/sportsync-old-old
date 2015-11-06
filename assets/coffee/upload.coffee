@@ -84,10 +84,7 @@ plot_numbers = (data) ->
   canvas = document.getElementById 'plot'
   h = 300
   w = canvas.parentElement.clientWidth
-  console.log 'width'
-  console.log w
   w = data.length*3
-  console.log w
 
   canvas.width = w
   canvas.height = h
@@ -101,6 +98,7 @@ plot_numbers = (data) ->
   dmin = data.reduce (a, b) -> if a < b then a else b
 
   ctx.font = "8px Georgia"
+  ctx.textAlign = "center"
   for each, i in data
     xi =  i / data.length * w
     yi =  h*(1 - (each - dmin)/(dmax-dmin))
@@ -108,20 +106,201 @@ plot_numbers = (data) ->
       ctx.moveTo(xi, yi)
       ctx.closePath()
     else
+      if /[A-Za-z]/.test(each)
+        yi = h
+
       text = String.fromCharCode each
       ctx.fillText(text, xi, 10)
       ctx.lineTo(xi, yi)
 
   ctx.stroke()
 
+regex_to_matches = (re, text, type) ->
+  temp = []
+  matches = []
+  for i in [1..2000] # limit tests to 2000
+    temp = re.exec text
+    break if temp == null
+    matches.push index: temp.index, value: temp[0], type: type
 
-parse_for_times = (data) ->
+  return matches
+
+find_splits = (page_text) ->
   re = /([0-9]{1,2}\:)?[0-9]{2}\.[0-9]{2}/g
+  return regex_to_matches re, page_text, 'split'
+
+find_events = (page_text) ->
+  re = /[Ee]vent\s*\d{1,3}\s*([Mm]en|[Ww]omen)\s*\d{2,4}\s[A-Z]\w*\s[A-Z][a-z]*/g
+  return regex_to_matches re, page_text, 'event'
+
+find_names = (page_text) ->
+  re = /[A-Z][a-z]*,\s[A-Z][a-z]*(\s\w)?/g
+  return regex_to_matches re, page_text, 'name'
+
+find_teams = (page_text, index=true) ->
+  re = /[A-Z][a-z]{3,}(\s[a-zA-Z][a-z]*)*-[A-Z]{2}/g
+  return regex_to_matches re, page_text, 'team'
+
+find_age = (page_text) ->
+  re = /(FR|SO|JR|SR)/g
+  return regex_to_matches re, page_text, 'age'
+
+find_header = (page_text) ->
+  #re = /([Nn]ame|[Yy]r|[Ss]chool|[Pp]relim\s[Tt]ime|[Ff]inals\s[Tt]ime)/g
+  #re = /((([Nn]ame|[Yy]r|[Ss]chool|[Pp]relim\s[Tt]ime|[Ff]inals\s[Tt]ime)\s*){2,})/g
+  re = /(([Nn]ame|[Yy]r|[Ss]chool|[Pp]relim\s[Tt]ime|[Ff]inals\s[Tt]ime){3,})/g
+  return regex_to_matches re, page_text, 'header'
+
+try_to_sort_out_header = (all_matches, all_pages) ->
+  all_broken = []
+  for page, page_index in all_pages
+    matches = all_matches[page_index]
+    broken = []
+    if matches.length == 0
+      broken.push page
+    else
+      matches.reduce((a, b, i, array) ->
+        broken.push page.slice(a, b)
+        if i == array.length - 1
+          broken.push page.slice array[i]
+        return b # <- important
+      , 0)
+
+    if all_broken.length > 0
+      last = all_broken.slice(-1)[0]
+      all_broken = all_broken.slice(0, -1).concat([last + broken[0]])
+      all_broken = all_broken.concat broken.slice(1)
+    else
+      all_broken = broken
+
+  return all_broken
+
+
+another_approach = (data) ->
+  data = data.map((page) ->
+    page_joined = page.reduce((a, b) -> a + b)
+    return page_joined
+  )
+
+  unique_team_names = []
+  header_matches = []
+  for page in data
+    #matches = find_splits(page)
+    #matches = find_events(page)
+    #matches = find_names(page)
+    matches = find_teams(page).map((e) -> e.value)
+    for match in matches
+      if unique_team_names.indexOf(match) == -1
+        unique_team_names.push match
+    #matches = find_age(page)
+    matches = find_header(page).map((e) -> e.index)
+    header_matches.push matches
+
+  broken_by_header = try_to_sort_out_header(header_matches, data)
+
+  for piece in broken_by_header.slice(3)
+    all_matches = []
+    matches = find_teams(piece)
+    all_matches = all_matches.concat matches
+    matches = find_age(piece)
+    all_matches = all_matches.concat matches
+    matches = find_events(piece)
+    all_matches = all_matches.concat matches
+    matches = find_splits(piece)
+    all_matches = all_matches.concat matches
+
+    broken = []
+    curr = []
+    test = all_matches.sort((a, b) -> a.index-b.index)
+    for each in test
+      if each.type == 'team'
+        if curr.length > 0
+          broken.push curr
+          curr = []
+        curr = [each]
+      else
+        curr.push each
+
+    console.log broken.map((e) -> e.map((f) -> f.value))
+    break
+
+  long_text.textContent = broken_by_header.join('\n')
+
+
+  return
+
+
+class ItemSet
+  constructor: (@doc_id) ->
+    ItemSet.item_sets[@doc_id] = @
+
+  items: []
+
+  @item_sets: {}
+
+class Item
+  constructor: (@original_index, @page, itemSet) ->
+    @type = 'hanging' # type not yet assigned
+
+    # was it joined with a preceding item
+    @concatenated = false
+
+    # if it was concatenated, but an obvious alt isn't available
+    @alt_value =  null
+
+    # add to list of items
+    ItemSet.item_sets[itemSet].items.push @
+
+parse_for_times = (data, page, doc_id) ->
+  re = /([0-9]{1,2}\:)?[0-9]{2}\.[0-9]{2}/
   console.log 'parse for data'
-  for item in data
-    itemsFound = []
-    while (itemsFound = re.exec(item)) != null
-      console.log itemsFound
+  new_data = []
+  pla = ""
+  for raw_item, raw_index in data
+    item = new Item(raw_index, page, doc_id)
+    first_result = re.exec pla + raw_item
+
+    if first_result? # does raw_item contain time?
+      {0: match, 1: _, index: ind, input: inp} = first_result
+
+      item.value = match
+
+      if pla != "" # was item concatenated with another item
+        pla_test = raw_item.match re
+        if pla_test? # does raw_item work without pla?
+          item.alt_value = match
+          {0: match, 1: _, index: ind, input: inp} = first_result
+          item.value = match # second value is probably* better (*meh)
+          item.type = 'split'
+
+        else # raw_item needs pla, so it is concatenated
+          item.concatenated = yes
+
+        pla = ""
+
+      remainder = raw_item.slice(ind + match.length)
+
+      second_result = remainder.match re
+
+      if second_result? # does remainder contain time?
+        new_item = new Item(raw_index, page, doc_id)
+        {0: match, 1: _, index: ind, input: inp} = first_result
+
+        new_item.value = match
+        new_item.type = 'split'
+
+      else
+        # check that pla contains numbers like its broken from another item
+        if /[0-9]/.test(pla)
+          pla = remainder
+
+    else # item didn't contain number
+      if /[0-9]/.test(pla)
+        pla = remainder
+
+      item.value = raw_item
+
+  return
 
 
 handleFileSelection = (e) ->
@@ -132,6 +311,11 @@ handleFileSelection = (e) ->
 
     reader.onload = (
       (file_object) ->
+        {name: filename, lastModified: filemod} = file_object
+        fileid = filename + '_' + filemod
+        console.log ItemSet.item_sets
+        if fileid not of ItemSet.item_sets
+          new ItemSet fileid
         (file_read_event) ->
           target = file_read_event.target.result
           # load pdf document
@@ -161,7 +345,8 @@ handleFileSelection = (e) ->
                 render_page(page, ctx, viewport).then (result) ->
                   console.log "rendered page #{page_number}"
 
-                  parse_for_times(result)
+                  #parse_for_times(result, page_number, fileid)
+
                   #try_to_solve result
                   #  .then (res) ->
                   #    console.log res
@@ -206,7 +391,11 @@ handleFileSelection = (e) ->
                 numbers[i] = elem.charCodeAt(0)
 
               plot_numbers numbers
-              text.textContent = all[0].join('\n')
+
+              another_approach all
+
+              #text.textContent = all.map((elem) -> elem.map(
+              #text.textContent = all[0].join('\n')
 
               ###
               page_regex = /[P,p]age\s*([1-9][0-9]|[1-9])/
@@ -256,5 +445,6 @@ file_button.addEventListener 'change', handleFileSelection, false
 
 canvas = document.getElementById 'canvas'
 text = document.getElementById 'text'
+long_text = document.getElementById 'long-text'
 increment_up = document.getElementById 'up'
 increment_down = document.getElementById 'down'
