@@ -115,13 +115,15 @@ plot_numbers = (data) ->
 
   ctx.stroke()
 
+time_to_seconds = (text_time) ->
+
 regex_to_matches = (re, text, type) ->
   temp = []
   matches = []
   for i in [1..2000] # limit tests to 2000
     temp = re.exec text
     break if temp == null
-    matches.push index: temp.index, value: temp[0], type: type
+    matches.push index: temp.index, value: temp[0], type: type.trim()
 
   return matches
 
@@ -175,6 +177,59 @@ try_to_sort_out_header = (all_matches, all_pages) ->
 
   return all_broken
 
+plot_data_types = (data) ->
+  canvas = document.getElementById 'plot'
+  ctx = canvas.getContext '2d'
+  #canvas.width = data.length*3
+  max_index = data.map((e) -> e.index).reduce((a, b) -> if a > b then a else b)
+  canvas.width = 10000
+  canvas.height = 200
+  w = canvas.width
+  h = canvas.height
+  l = data.length
+  r = 3
+  repeatedCount = 0
+  lastType = ""
+  ctx.fillStyle = 'gray'
+  ctx.fillRect(0, 0, w, h)
+  for point, i in data
+    xi = w / max_index * point.index
+    ctx.fillStyle = 'white'
+    ctx.fillRect xi, 0, w / max_index * point.value.length, h
+    ctx.beginPath()
+    #xi = i / l * w
+    if point.type == 'split'
+      ctx.fillStyle = 'red'
+      yi = 5*h/6
+    else if point.type == 'age'
+      ctx.fillStyle = 'yellow'
+      yi = 4*h/6
+    else if point.type == 'team'
+      ctx.fillStyle = 'orange'
+      yi = 3*h/6
+    else if point.type == 'event'
+      ctx.fillStyle = 'green'
+      yi = 2*h/6
+    else if point.type == 'name'
+      ctx.fillStyle = 'brown'
+      yi = 1*h/6
+    else
+      console.log point.type
+      ctx.fillStyle = 'black'
+      yi = h
+
+    ctx.arc xi, yi, r, 0, 2*Math.PI, false
+    ctx.fill()
+    if lastType == point.type
+      repeatedCount += 1
+    else
+      if repeatedCount > 10
+        ctx.fillStyle = 'black'
+        ctx.fillText String(repeatedCount), xi - (repeatedCount * w / l / 2), h/2
+      repeatedCount = 0
+
+    lastType = point.type
+
 
 another_approach = (data) ->
   data = data.map((page) ->
@@ -197,8 +252,10 @@ another_approach = (data) ->
     header_matches.push matches
 
   broken_by_header = try_to_sort_out_header(header_matches, data)
+  sorted_matches = []
 
-  for piece in broken_by_header.slice(3)
+  last_index = 0
+  for piece in broken_by_header.slice(0)
     all_matches = []
     matches = find_teams(piece)
     all_matches = all_matches.concat matches
@@ -208,24 +265,16 @@ another_approach = (data) ->
     all_matches = all_matches.concat matches
     matches = find_splits(piece)
     all_matches = all_matches.concat matches
+    matches = find_names(piece)
+    all_matches = all_matches.concat matches
 
     broken = []
     curr = []
-    test = all_matches.sort((a, b) -> a.index-b.index)
-    for each in test
-      if each.type == 'team'
-        if curr.length > 0
-          broken.push curr
-          curr = []
-        curr = [each]
-      else
-        curr.push each
+    sorted = all_matches.sort((a, b) -> a.index-b.index).map((e) -> e.index = e.index + last_index; e)
+    sorted_matches = sorted_matches.concat sorted
+    last_index = sorted.map((e) -> e.index).reduce((a, b) -> if a > b then a else b)
 
-    console.log broken.map((e) -> e.map((f) -> f.value))
-    break
-
-  long_text.textContent = broken_by_header.join('\n')
-
+  plot_data_types sorted_matches
 
   return
 
@@ -390,7 +439,7 @@ handleFileSelection = (e) ->
               for elem, i in res
                 numbers[i] = elem.charCodeAt(0)
 
-              plot_numbers numbers
+              #plot_numbers numbers
 
               another_approach all
 
