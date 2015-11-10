@@ -115,7 +115,28 @@ plot_numbers = (data) ->
 
   ctx.stroke()
 
-time_to_seconds = (text_time) ->
+
+mseconds_to_string = (mseconds) ->
+  minutes = Math.floor(mseconds / 6000)
+  seconds = Math.floor((mseconds - minutes*6000) / 100)
+  mseconds = mseconds-minutes*6000-seconds*100
+  return "#{minutes}:#{seconds}.#{mseconds}"
+
+split_to_mseconds = (text_time) ->
+  val = text_time.value
+  both = val.split(':')
+  min = sec = msec = 0
+  if both.length == 2
+    [min, secs] = both
+  else if both.length == 1
+    secs = both[0]
+
+  [sec, msec] = secs.split('.')
+  [min, sec, msec] = [min, sec, msec].map (e) -> Number e
+  ret = min*60*100 + sec*100 + msec
+  
+  return ret
+
 
 regex_to_matches = (re, text, type) ->
   temp = []
@@ -137,13 +158,14 @@ find_events = (page_text) ->
 
 find_names = (page_text) ->
   re = /[A-Z][a-z]*,\s[A-Z][a-z]*(\s\w)?/g
+  re = /[A-Z][a-z]*,\s*[A-Z][a-z]*(-[A-Z][a-z]*){0,1}(\s\w)?/g #includes hyphenated names
   return regex_to_matches re, page_text, 'name'
 
 find_teams = (page_text, index=true) ->
   re = /[A-Z][a-z]{3,}(\s[a-zA-Z][a-z]*)*-[A-Z]{2}/g
   return regex_to_matches re, page_text, 'team'
 
-find_age = (page_text) ->
+find_ages = (page_text) ->
   re = /(FR|SO|JR|SR)/g
   return regex_to_matches re, page_text, 'age'
 
@@ -188,8 +210,8 @@ plot_data_types = (data) ->
   h = canvas.height
   l = data.length
   r = 3
-  repeatedCount = 0
-  lastType = ""
+  #repeatedCount = 0
+  #lastType = ""
   ctx.fillStyle = 'gray'
   ctx.fillRect(0, 0, w, h)
   for point, i in data
@@ -214,21 +236,58 @@ plot_data_types = (data) ->
       ctx.fillStyle = 'brown'
       yi = 1*h/6
     else
+      # this shouldn't happen
       console.log point.type
       ctx.fillStyle = 'black'
       yi = h
 
     ctx.arc xi, yi, r, 0, 2*Math.PI, false
     ctx.fill()
-    if lastType == point.type
-      repeatedCount += 1
-    else
-      if repeatedCount > 10
-        ctx.fillStyle = 'black'
-        ctx.fillText String(repeatedCount), xi - (repeatedCount * w / l / 2), h/2
-      repeatedCount = 0
+    #if lastType == point.type
+    #  repeatedCount += 1
+    #else
+    #  if repeatedCount > 10
+    #    ctx.fillStyle = 'black'
+    #    ctx.fillText String(repeatedCount), xi - (repeatedCount * w / l / 2), h/2
+    #  repeatedCount = 0
 
+    #lastType = point.type
+  lastType = ""
+  currVal = 0
+  currInd = 0
+  toast = []
+  for point, i in data
+    if lastType == point.type
+      currVal += 1
+    else
+      toast.push currVal
+      currVal = 0
+      currInd += 1
     lastType = point.type
+
+  console.log toast.length
+  canvas = document.getElementById 'plot2'
+  ctx = canvas.getContext '2d'
+
+  maxval = toast.reduce (a, b) -> if a > b then a else b
+  minval = toast.reduce (a, b) -> if a < b then a else b
+  w = 10000
+  h = 200
+  canvas.height = h
+  canvas.width = w
+
+  ctx.beginPath()
+  ctx.moveTo 0, h
+  for each, i in toast
+    xi = i / toast.length*w
+    yi = (1 - (each - minval) / (maxval - minval))*h
+    ctx.lineTo xi, yi
+
+
+  ctx.stroke()
+  ctx.closePath()
+
+  return
 
 
 another_approach = (data) ->
@@ -237,44 +296,101 @@ another_approach = (data) ->
     return page_joined
   )
 
-  unique_team_names = []
-  header_matches = []
-  for page in data
-    #matches = find_splits(page)
-    #matches = find_events(page)
-    #matches = find_names(page)
-    matches = find_teams(page).map((e) -> e.value)
-    for match in matches
-      if unique_team_names.indexOf(match) == -1
-        unique_team_names.push match
-    #matches = find_age(page)
-    matches = find_header(page).map((e) -> e.index)
-    header_matches.push matches
-
-  broken_by_header = try_to_sort_out_header(header_matches, data)
-  sorted_matches = []
-
   last_index = 0
-  for piece in broken_by_header.slice(0)
-    all_matches = []
-    matches = find_teams(piece)
-    all_matches = all_matches.concat matches
-    matches = find_age(piece)
-    all_matches = all_matches.concat matches
-    matches = find_events(piece)
-    all_matches = all_matches.concat matches
-    matches = find_splits(piece)
-    all_matches = all_matches.concat matches
-    matches = find_names(piece)
-    all_matches = all_matches.concat matches
+  all_splits = []
+  all_events = []
+  all_names = []
+  all_teams = []
+  all_ages = []
 
-    broken = []
-    curr = []
-    sorted = all_matches.sort((a, b) -> a.index-b.index).map((e) -> e.index = e.index + last_index; e)
-    sorted_matches = sorted_matches.concat sorted
-    last_index = sorted.map((e) -> e.index).reduce((a, b) -> if a > b then a else b)
+  add_last_index = (last_index) ->
+    (e) ->
+      e.index = e.index + last_index
+      return e
 
-  plot_data_types sorted_matches
+  for page in data
+    team_matches = find_teams(page)
+    team_matches.map (e) -> e.index=e.index+last_index; e
+    last_index += page.length
+
+    fn = add_last_index(last_index)
+    all_splits = all_splits.concat find_splits(page).map fn
+    all_events = all_events.concat find_events(page).map fn
+    all_names = all_names.concat find_names(page).map fn
+    all_teams = all_teams.concat find_teams(page).map fn
+    all_ages = all_ages.concat find_ages(page).map fn
+
+  all = all_splits.concat all_events.concat all_names.concat all_teams.concat all_ages
+  plot_data_types all.sort (a, b) -> a.index-b.index
+
+  # sort by index
+  #unique_team_names = []
+  #header_matches = []
+
+  #for page in data
+  #  #matches = find_splits(page)
+  #  #matches = find_events(page)
+  #  #matches = find_names(page)
+  #  matches = find_teams(page).map((e) -> e.value)
+  #  for match in matches
+  #    if unique_team_names.indexOf(match) == -1
+  #      unique_team_names.push match
+  #  #matches = find_ages(page)
+  #  matches = find_header(page).map((e) -> e.index)
+  #  header_matches.push matches
+
+  #broken_by_header = try_to_sort_out_header(header_matches, data)
+  #sorted_matches = []
+
+  #last_index = 0
+  #for piece in broken_by_header.slice(0)
+  #  all_matches = []
+  #  matches = find_teams(piece)
+  #  all_matches = all_matches.concat matches
+  #  matches = find_ages(piece)
+  #  all_matches = all_matches.concat matches
+  #  matches = find_events(piece)
+  #  all_matches = all_matches.concat matches
+  #  matches = find_splits(piece)
+  #  all_matches = all_matches.concat matches
+  #  matches = find_names(piece)
+  #  all_matches = all_matches.concat matches
+
+  #  broken = []
+  #  curr = []
+  #  sorted = all_matches.sort((a, b) -> a.index-b.index).map((e) -> e.index = e.index + last_index; e)
+  #  sorted_matches = sorted_matches.concat sorted
+  #  last_index = sorted.map((e) -> e.index).reduce((a, b) -> if a > b then a else b)
+
+  #plot_data_types sorted_matches
+
+  # split ident
+  #curr = []
+  #for match in sorted_matches
+  #  if match.type == 'split'
+  #    ret = split_to_mseconds match
+  #    curr.push ret
+  #  else
+  #    if curr.length > 0
+  #      console.log "len: #{curr.length}"
+  #      if curr.length > 3
+  #        curr_sorted = curr.sort (a, b) -> b-a
+  #        out = []
+  #        index = 0
+  #        cnt = 0
+  #        acnt = 0
+  #        while index < curr_sorted.length - 1
+  #          cur = curr_sorted[index]
+  #          nxt = curr_sorted[index+1]
+  #          diff = cur - nxt
+  #          cnt += if diff in curr_sorted then 1 else 0
+  #          acnt += if [diff + 1, diff - 1, diff].some((e) -> e in curr_sorted) then 1 else 0
+  #          index+=1
+
+  #        console.log " cnt: #{cnt}"
+  #        console.log "acnt: #{acnt}"
+
+  #    curr = []
 
   return
 
@@ -431,16 +547,6 @@ handleFileSelection = (e) ->
               )(page_number)
 
             ).then (all) ->
-              res = all.reduce (a, b) ->
-                a.concat(b)
-              .reduce (a, b) ->
-                a + '\n' + b
-              numbers = []
-              for elem, i in res
-                numbers[i] = elem.charCodeAt(0)
-
-              #plot_numbers numbers
-
               another_approach all
 
               #text.textContent = all.map((elem) -> elem.map(
