@@ -32,14 +32,6 @@ time_and_split = (array) ->
   return [total_time, if split_time then split_time else null]
 
 
-ms_to_each = (milliseconds) ->
-  minutes = Math.floor(milliseconds / 600000)
-  seconds = milliseconds % 600000 / 10000
-  ms = milliseconds % 10000
-
-  return [minutes, seconds, ms]
-
-
 try_to_solve = (string_array) ->
   new Promise (resolve, reject) ->
     toast = []
@@ -116,26 +108,48 @@ plot_numbers = (data) ->
   ctx.stroke()
 
 
-mseconds_to_string = (mseconds) ->
+ms_to_string = (mseconds) ->
   minutes = Math.floor(mseconds / 6000)
-  seconds = Math.floor((mseconds - minutes*6000) / 100)
-  mseconds = mseconds-minutes*6000-seconds*100
-  return "#{minutes}:#{seconds}.#{mseconds}"
+  seconds = '00' + String(Math.floor((mseconds - minutes*6000) / 100))
+  mseconds = '00' + String(mseconds-minutes*6000-seconds*100)
+  if minutes == 0
+    return "#{seconds.slice(-2)}.#{mseconds.slice(-2)}"
+  else
+    return "#{minutes}:#{seconds.slice(-2)}.#{mseconds.slice(-2)}"
+ 
 
-split_to_mseconds = (text_time) ->
-  val = text_time.value
+#ms_to_each = (milliseconds) ->
+#  #ret = min*60*100 + sec*100 + msec
+#  minutes = Math.floor(milliseconds / 60*100)
+#  seconds = Math.floor((milliseconds - minutes*60*100)/100)
+#  ms = milliseconds - minutes*60*100 - seconds*100
+#
+#  return [minutes, seconds, ms]
+
+split_to_ms = (match_object) ->
+  val = match_object.value
   both = val.split(':')
-  min = sec = msec = 0
+  min = sec = msec = '0'
   if both.length == 2
     [min, secs] = both
   else if both.length == 1
     secs = both[0]
 
+  if min.length == 2 and min[1] != '0'
+    altmin = min[1]
+  else altmin = null
+
   [sec, msec] = secs.split('.')
   [min, sec, msec] = [min, sec, msec].map (e) -> Number e
   ret = min*60*100 + sec*100 + msec
-  
-  return ret
+
+  if altmin?
+    altret = altmin*60*100 + sec*100 + msec
+    match_object.numerical_value_alt = altret
+
+  match_object.numerical_value = ret
+
+  return match_object
 
 
 regex_to_matches = (re, text, type) ->
@@ -148,16 +162,17 @@ regex_to_matches = (re, text, type) ->
 
   return matches
 
-find_splits = (page_text) ->
+find_splits = (page_text, convert_to_numvalue=true) ->
   re = /([0-9]{1,2}\:)?[0-9]{2}\.[0-9]{2}/g
-  return regex_to_matches re, page_text, 'split'
+  matches = regex_to_matches re, page_text, 'split'
+  return matches.map split_to_ms
 
 find_events = (page_text) ->
   re = /[Ee]vent\s*\d{1,3}\s*([Mm]en|[Ww]omen)\s*\d{2,4}\s[A-Z]\w*\s[A-Z][a-z]*/g
   return regex_to_matches re, page_text, 'event'
 
 find_names = (page_text) ->
-  re = /[A-Z][a-z]*,\s[A-Z][a-z]*(\s\w)?/g
+  #re = /[A-Z][a-z]*,\s[A-Z][a-z]*(\s\w)?/g
   re = /[A-Z][a-z]*,\s*[A-Z][a-z]*(-[A-Z][a-z]*){0,1}(\s\w)?/g #includes hyphenated names
   return regex_to_matches re, page_text, 'name'
 
@@ -265,7 +280,6 @@ plot_data_types = (data) ->
       currInd += 1
     lastType = point.type
 
-  console.log toast.length
   canvas = document.getElementById 'plot2'
   ctx = canvas.getContext '2d'
 
@@ -310,7 +324,7 @@ another_approach = (data) ->
 
   for page in data
     team_matches = find_teams(page)
-    team_matches.map (e) -> e.index=e.index+last_index; e
+    #team_matches.map (e) -> e.index=e.index+last_index; e
     last_index += page.length
 
     fn = add_last_index(last_index)
@@ -321,7 +335,55 @@ another_approach = (data) ->
     all_ages = all_ages.concat find_ages(page).map fn
 
   all = all_splits.concat all_events.concat all_names.concat all_teams.concat all_ages
-  plot_data_types all.sort (a, b) -> a.index-b.index
+  all_sorted = all.sort (a, b) -> a.index-b.index
+
+  cnt = 0
+  current_event_results = []
+  current_event = ""
+  live = false
+  for element, i in all_sorted
+    if element.type == 'event'
+      if live and current_event != element.value
+        break
+      else
+        live = true
+        current_event = element.value
+
+    if live
+      current_event_results.push element
+
+  # break up into name-age-team-etc groups
+  split_groups = []
+  split_group = []
+  active = true
+  for each in current_event_results
+    if each.type == 'split'
+      active = true
+    else if active == true
+      split_groups.push split_group
+      split_group = []
+      active = false
+
+    split_group.push each
+
+  for split_group in split_groups.slice(4)
+    just_splits = []
+    for each in split_group
+      if each.type == 'split'
+        just_splits.push each
+
+    console.log just_splits.sort (a, b) -> a.numerical_value - b.numerical_value
+
+    #for each in just_splits
+    #  if each.numerical_value_alt?
+    #    console.log "#{ms_to_string(each.numerical_value)} or #{ms_to_string(each.numerical_value_alt)}"
+    #  else
+    #    console.log "#{ms_to_string(each.numerical_value)}"
+
+    break
+  #plot_data_types current_event_results
+
+  #plot_data_types all_sorted
 
   # sort by index
   #unique_team_names = []
