@@ -1,0 +1,24 @@
+extends layout
+
+block content
+  p Upload stuff :D
+
+  input(type="file" id="files" name="files" multiple)
+
+  br
+  .bordered
+    canvas#canvas
+
+  br
+  button(name='up')#up +
+  button(name='down')#down -
+  div#canvas-holder
+    canvas#plot
+    canvas#plot2
+    pre#long-text
+  pre#text
+
+
+block scripts
+  script(src="/components/pdfjs-dist/build/pdf.combined.js")
+  script(src="/js/upload.js")

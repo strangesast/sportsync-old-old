@@ -37,7 +37,7 @@ module.exports = (grunt) ->
         files: '**/*.coffee'
         tasks: ['coffee:src', 'coffee:assets']
       less:
-        files: 'assets/css/**/*.less'
+        files: 'assets/less/**/*.less'
         tasks: ['less:all']
       jade:
         files: 'views/_*.jade'

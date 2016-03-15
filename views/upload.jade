@@ -1,24 +1,25 @@
 extends layout
 
+block head
+  link(rel='stylesheet', href='/css/upload.css')
+
 block content
-  p Upload stuff :D
-
-  input(type="file" id="files" name="files" multiple)
-
-  br
-  .bordered
-    canvas#canvas
-
-  br
-  button(name='up')#up +
-  button(name='down')#down -
-  div#canvas-holder
-    canvas#plot
-    canvas#plot2
-    pre#long-text
-  pre#text
-
+  .container
+    .header
+      .header-item upload
+      span.spacer
+      .header-item sign in
+      .header-item status
+    .center
+      .block#preview
+        .button
+          label(for="file-upload") Upload
+          input#file-upload(type="file")
+      .block#results
+      .block
+      .block
+    .footer
 
 block scripts
   script(src="/components/pdfjs-dist/build/pdf.combined.js")
-  script(src="/js/upload.js")
+  script(src="/js/upload2.js")
